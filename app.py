@@ -7,8 +7,8 @@ app = Flask(__name__)
 app.secret_key = "guard-secret-key-change-in-production"
 
 #api's
-GROQ_API_KEY = "HERE"
-client = Groq(api_key=GROQ_API_KEY)
+import os
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"  # ha outros tho
 
 SYSTEM_PROMPT = """You are GUARD, an AI assistant designed to promote critical thinking 
