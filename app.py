@@ -17,6 +17,7 @@ and healthy skepticism. When answering:
 2. When appropriate, suggest that the user verify important information.
 3. Mention if information might be outdated or if sources would be helpful.
 4. Encourage the user to think critically rather than blindly accepting your answer.
+5. At the end of your response, ALWAYS include a "**Confidence Score: X%**" stating how confident you are in your answer, and a "**Recommended Verification Sources:**" section with 2-3 specific queries or links they can use to fact-check you.
 Keep responses concise and conversational.""" # deviamos acrescentar que queremos algo em que o user use ai para ajudar e nao para fazer e tudo o que for parecido a fazer apenas deves er negado
 
 
@@ -30,23 +31,25 @@ def init_session():
             "total_messages": 0,
         }
 
-def calculate_trust_score(td): # isto ainda esta um bocado rudimentar e precisa ser melhorado
+def calculate_trust_score(td):
     total = td["total_messages"]
     if total == 0:
         return 50, 50
 
     research = 100
-    fast_ratio = td["fast_actions"] / total
-    research -= int(fast_ratio * 40)
-    streak_penalty = min(td["no_followup_streak"] * 8, 40)
+    if total > 0:
+        fast_ratio = td["fast_actions"] / total
+        research -= int(fast_ratio * 40)
+    streak_penalty = min(td["no_followup_streak"] * 5, 60)
     research -= streak_penalty
     research = max(10, min(100, research))
 
-    if td["prompt_variety"]:
-        avg_words = sum(td["prompt_variety"]) / len(td["prompt_variety"])
-        depth = min(100, int(avg_words * 6))
-        if len(set(td["prompt_variety"])) < len(td["prompt_variety"]) * 0.5:
-            depth -= 20
+    recent_prompts = td["prompt_variety"][-4:] if td["prompt_variety"] else []
+    if recent_prompts:
+        avg_words = sum(recent_prompts) / len(recent_prompts)
+        depth = min(100, int((avg_words / 20.0) * 100))
+        if len(set(recent_prompts)) == 1 and avg_words < 5:
+            depth -= 30
     else:
         depth = 50
     depth = max(10, min(100, depth))

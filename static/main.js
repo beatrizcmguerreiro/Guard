@@ -1,8 +1,28 @@
+const SAVED_CHATS_KEY = 'guard_chats';
+const SAVED_ACTIVE_CHAT_KEY = 'guard_active_chat';
+
 const state = {
-  chats: [],          // [{id, title, history: [{role, content}]}] so que isto nao esta a guardar em cache, podemos guardar se for conveniente
+  chats: [],
   activeChatId: null,
   isLoading: false,
 };
+
+function saveState() {
+  localStorage.setItem(SAVED_CHATS_KEY, JSON.stringify(state.chats));
+  localStorage.setItem(SAVED_ACTIVE_CHAT_KEY, state.activeChatId || '');
+}
+
+function loadState() {
+  try {
+    const savedChats = localStorage.getItem(SAVED_CHATS_KEY);
+    if (savedChats) state.chats = JSON.parse(savedChats);
+    state.activeChatId = localStorage.getItem(SAVED_ACTIVE_CHAT_KEY) || null;
+  } catch (e) {
+    console.error('Error loading state from localStorage:', e);
+  }
+}
+
+loadState();
 
 //coisinhas definidas no html
 const sidebar        = document.getElementById('sidebar');
@@ -42,6 +62,7 @@ function createChat() {
   const chat = { id, title: 'New chat', history: [] };
   state.chats.unshift(chat);
   state.activeChatId = id;
+  saveState();
   renderChatList();
   showWelcome();
   messageInput.focus();
@@ -51,6 +72,7 @@ function createChat() {
 
 function setActiveChat(id) {
   state.activeChatId = id;
+  saveState();
   renderChatList();
   const chat = state.chats.find(c => c.id === id);
   if (!chat) return;
@@ -212,6 +234,7 @@ async function sendMessage() {
 
   // mostrar a mensagem na interface
   chat.history.push({ role: 'user', content: text });
+  saveState();
   appendMessage('user', text);
   messageInput.value = '';
   autoResize();
@@ -238,6 +261,7 @@ async function sendMessage() {
       appendMessage('assistant', 'error' + data.error);
     } else {
       chat.history.push({ role: 'assistant', content: data.response });
+      saveState();
       appendMessage(
         'assistant',
         data.response,
@@ -285,4 +309,13 @@ trustToggle.addEventListener('click', () => {
 //new chat
 newChatBtn.addEventListener('click', createChat);
 
-createChat();
+if (state.chats.length === 0) {
+  createChat();
+} else {
+  renderChatList();
+  if (state.activeChatId && state.chats.find(c => c.id === state.activeChatId)) {
+    setActiveChat(state.activeChatId);
+  } else {
+    setActiveChat(state.chats[0].id);
+  }
+}

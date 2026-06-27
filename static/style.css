@@ -433,8 +433,13 @@ body {
 
 .trust-panel.collapsed {
   width: 0;
-  overflow: hidden;
   border-left: none;
+}
+
+.trust-panel.collapsed .trust-content {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .trust-toggle {
