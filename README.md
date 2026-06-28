@@ -17,6 +17,25 @@ GUARD acts as an intermediary layer between the user and the language model.
     - **Action**: When trust metrics indicate over-reliance (scores drop too low), the system triggers an intervention.
     - **Feedback**: Users are prompted to verify facts, reducing reliance and recalibrating the trust loop.
 
+## Prototype Features
+- **Explainable Trust Panel**: Shows short reasons behind score changes, such as very short prompts, missing follow-up questions, or source clicks.
+- **Verification Tracking**: Counts source-click actions as observable verification behavior.
+- **Intervention History**: Keeps a visible record of GUARD's nudges during the session.
+- **Trust Timeline**: Shows how research and prompt-depth scores change throughout the conversation.
+- **Typed Interventions**: Labels nudges as verification, reflection, source, or slow-down nudges.
+- **User Correction**: Lets users tell GUARD when they verified elsewhere or when a score feels wrong.
+- **End-of-Session Reflection**: Collects lightweight feedback about verification, intrusiveness, and critical-thinking support.
+- **Reflection Prompts**: Offers quick follow-up prompts such as "What could be wrong?", "Show alternative view", and "Give me sources".
+- **Trust Score Legend**: Explains score ranges from healthy engagement to overreliance risk.
+- **PDF Session Report**: Generates a printable report with the chat, trust state, timeline, interventions, corrections, and reflection answers.
+
+## Interface and Usability Features
+- **Resizable Trust Panel**: Users can drag the left edge of the Trust Panel to make it wider or narrower, and double-click to reset its width.
+- **Collapsible Side Panels**: The chat sidebar and Trust Panel can be collapsed to give the user more room for the conversation.
+- **Automatic Chat Titles**: Chat names summarize the conversation topic instead of copying the first user message. For example, API-related errors become "API setup check" and greeting-only chats become "General chat".
+- **Persistent Local State**: Chats, settings, selected conversation, Trust Panel width, and reflection answers are stored locally in the browser.
+- **Polished Responsive UI**: The interface uses larger, more readable controls and consistent typography across the chat sidebar, main conversation, and Trust Panel.
+
 ## Short User Study & Results
 We conducted a short user study with 25 participants to observe interactions with GUARD during ~5-minute interaction sessions.
 

@@ -29,6 +29,47 @@ def calculate_trust_score(td):
     d = td.get("current_depth_score", 50)
     return r, d
 
+def ensure_trust_lists(td):
+    td.setdefault("last_message_time", None)
+    td.setdefault("fast_actions", 0)
+    td.setdefault("no_followup_streak", 0)
+    td.setdefault("prompt_variety", [])
+    td.setdefault("total_messages", 0)
+    td.setdefault("score_reasons", [])
+    td.setdefault("intervention_history", [])
+    td.setdefault("intervention_types", [])
+    td.setdefault("score_timeline", [])
+    td.setdefault("user_corrections", [])
+    td.setdefault("links_clicked", 0)
+    td.setdefault("blind_commands", 0)
+    td.setdefault("current_research_score", 50)
+    td.setdefault("current_depth_score", 50)
+
+def remember_score_reason(td, reason):
+    ensure_trust_lists(td)
+    if reason and reason not in td["score_reasons"]:
+        td["score_reasons"].append(reason)
+    td["score_reasons"] = td["score_reasons"][-5:]
+
+def remember_intervention(td, label, kind=None):
+    ensure_trust_lists(td)
+    if label:
+        td["intervention_history"].append(label)
+    td["intervention_history"] = td["intervention_history"][-5:]
+    if kind:
+        td["intervention_types"].append(kind)
+    td["intervention_types"] = td["intervention_types"][-8:]
+
+def remember_timeline_point(td):
+    ensure_trust_lists(td)
+    research_score, depth_score = calculate_trust_score(td)
+    td["score_timeline"].append({
+        "message": td.get("total_messages", 0),
+        "research": research_score,
+        "depth": depth_score,
+    })
+    td["score_timeline"] = td["score_timeline"][-12:]
+
 def should_intervene(td, settings):
     strictness = settings.get("strictness", 50) if settings else 50
     # Map strictness [20, 90] to thresholds
@@ -89,6 +130,7 @@ def chat():
             "current_research_score": 50,
             "current_depth_score": 50,
         }
+    ensure_trust_lists(td)
 
     data = request.json
     user_message = data.get("message", "").strip()
@@ -107,6 +149,7 @@ def chat():
         
         if time_taken < 4:
             delta_r -= 10
+            remember_score_reason(td, "Reply sent very quickly")
             
         if chat_history and chat_history[-1].get("role") == "assistant":
             last_ai_msg = chat_history[-1].get("content", "")
@@ -115,20 +158,26 @@ def chat():
             
             if time_taken < max(3, expected_read_time * 0.3):
                 delta_r -= 15
+                remember_score_reason(td, "Little time spent reviewing the previous answer")
             elif time_taken >= expected_read_time * 0.8 and time_taken < expected_read_time * 5:
                 delta_r += 5
+                remember_score_reason(td, "User spent time reviewing the previous answer")
 
     blind_phrases = ["just do it", "do this", "no explanation", "without explanation", "only the answer", "don't explain"]
     if any(p in user_message.lower() for p in blind_phrases):
         delta_r -= 20
+        td["blind_commands"] = td.get("blind_commands", 0) + 1
+        remember_score_reason(td, "Blind-compliance phrase detected")
 
     question_words = ["what", "why", "how", "when", "who", "where", "?", "can you", "could you", "is it", "are there"]
     if any(w in user_message.lower() for w in question_words):
         td["no_followup_streak"] = 0
         delta_r += 5
+        remember_score_reason(td, "Follow-up question detected")
     else:
         td["no_followup_streak"] += 1
         delta_r -= 5
+        remember_score_reason(td, "No follow-up question detected")
 
     td["current_research_score"] = max(10, min(100, td.get("current_research_score", 50) + delta_r))
 
@@ -138,6 +187,11 @@ def chat():
         target_depth = min(100, int((avg_words / 20.0) * 100))
         if len(set(recent_prompts)) == 1 and avg_words < 5:
             target_depth -= 30
+            remember_score_reason(td, "Repeated very short prompts")
+        elif len(user_message.split()) < 5:
+            remember_score_reason(td, "Prompt was very short")
+        elif avg_words >= 12:
+            remember_score_reason(td, "Prompt included useful context")
         target_depth = max(10, min(100, target_depth))
         # Move smoothly towards target
         td["current_depth_score"] = int(td.get("current_depth_score", 50) * 0.7 + target_depth * 0.3)
@@ -165,10 +219,20 @@ def chat():
     intervene = should_intervene(td, settings)
     intervention_msg = get_intervention_message(td, settings) if intervene else None
     sources = get_sources_suggestion(user_message) if intervene or research_score < 50 else []
+    if intervene:
+        if intervention_msg and "specific" in intervention_msg:
+            remember_intervention(td, "Suggested a deeper prompt", "reflection nudge")
+        elif intervention_msg and "verifying" in intervention_msg:
+            remember_intervention(td, "Asked user to verify", "verification nudge")
+        else:
+            remember_intervention(td, "Recommended checking key facts", "slow-down nudge")
+    if sources:
+        remember_intervention(td, "Recommended sources", "source nudge")
 
     is_locked = False
     if (research_score + depth_score) / 2 < 20:
         is_locked = True
+    remember_timeline_point(td)
 
     return jsonify({
         "response": ai_response,
@@ -179,7 +243,12 @@ def chat():
             "intervention_message": intervention_msg,
             "sources": sources,
             "keep_researching": research_score < 60,
-            "locked": is_locked
+            "locked": is_locked,
+            "score_reasons": td.get("score_reasons", []),
+            "intervention_history": td.get("intervention_history", []),
+            "intervention_types": td.get("intervention_types", []),
+            "score_timeline": td.get("score_timeline", []),
+            "verification_actions": td.get("links_clicked", 0),
         },
         "trust_data": td
     })
@@ -190,10 +259,13 @@ def update_trust():
     td = data.get("trust_data")
     if not td:
         return jsonify({"error": "No trust data"}), 400
+    ensure_trust_lists(td)
     
     settings = data.get("settings", {"strictness": 50})
     td["links_clicked"] = td.get("links_clicked", 0) + 1
     td["current_research_score"] = max(10, min(100, td.get("current_research_score", 50) + 20))
+    remember_score_reason(td, "User clicked a source")
+    remember_intervention(td, "User followed a verification link", "verification nudge")
     research_score, depth_score = calculate_trust_score(td)
     intervene = should_intervene(td, settings)
     intervention_msg = get_intervention_message(td, settings) if intervene else None
@@ -201,6 +273,7 @@ def update_trust():
     is_locked = False
     if (research_score + depth_score) / 2 < 20:
         is_locked = True
+    remember_timeline_point(td)
         
     return jsonify({
         "trust": {
@@ -208,7 +281,54 @@ def update_trust():
             "depth_score": depth_score,
             "intervene": intervene,
             "intervention_message": intervention_msg,
-            "locked": is_locked
+            "locked": is_locked,
+            "score_reasons": td.get("score_reasons", []),
+            "intervention_history": td.get("intervention_history", []),
+            "intervention_types": td.get("intervention_types", []),
+            "score_timeline": td.get("score_timeline", []),
+            "verification_actions": td.get("links_clicked", 0),
+        },
+        "trust_data": td
+    })
+
+@app.route("/correct_trust", methods=["POST"])
+def correct_trust():
+    data = request.json
+    td = data.get("trust_data")
+    if not td:
+        return jsonify({"error": "No trust data"}), 400
+    ensure_trust_lists(td)
+
+    correction = data.get("correction", "User corrected the score")
+    settings = data.get("settings", {"strictness": 50})
+    td["current_research_score"] = max(10, min(100, td.get("current_research_score", 50) + 15))
+    td["current_depth_score"] = max(10, min(100, td.get("current_depth_score", 50) + 5))
+    td["user_corrections"].append({
+        "message": td.get("total_messages", 0),
+        "correction": correction,
+    })
+    td["user_corrections"] = td["user_corrections"][-5:]
+    remember_score_reason(td, correction)
+    remember_intervention(td, "User corrected GUARD's interpretation", "user correction")
+
+    research_score, depth_score = calculate_trust_score(td)
+    intervene = should_intervene(td, settings)
+    intervention_msg = get_intervention_message(td, settings) if intervene else None
+    is_locked = (research_score + depth_score) / 2 < 20
+    remember_timeline_point(td)
+
+    return jsonify({
+        "trust": {
+            "research_score": research_score,
+            "depth_score": depth_score,
+            "intervene": intervene,
+            "intervention_message": intervention_msg,
+            "locked": is_locked,
+            "score_reasons": td.get("score_reasons", []),
+            "intervention_history": td.get("intervention_history", []),
+            "intervention_types": td.get("intervention_types", []),
+            "score_timeline": td.get("score_timeline", []),
+            "verification_actions": td.get("links_clicked", 0),
         },
         "trust_data": td
     })

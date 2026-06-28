@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>GUARD — Think for yourself</title>
+<title>GUARD - Think for yourself</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/static/style.css"/>
@@ -59,7 +59,7 @@
       <p class="tagline">think for yourself</p>
     </div>
     <h1 class="welcome-greeting" id="greeting">Good morning!</h1>
-    <p class="welcome-sub">Ask me anything — I'll help you think critically.</p>
+    <p class="welcome-sub">Ask me anything - I'll help you think critically.</p>
   </div>
 
   <!-- Chat messages -->
@@ -73,7 +73,7 @@
       <textarea
         id="messageInput"
         class="message-input"
-        placeholder="Ask something…"
+        placeholder="Ask something..."
         rows="1"
         autocomplete="off"
       ></textarea>
@@ -88,6 +88,7 @@
 
 <!--  Trust Panel  -->
 <aside class="trust-panel" id="trustPanel">
+  <div class="trust-resize-handle" id="trustResizeHandle" title="Resize trust panel"></div>
   <button class="trust-toggle" id="trustToggle" title="Toggle trust panel">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
       <path d="M9 1l4 6-4 6M5 13l-4-6 4-6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -114,6 +115,101 @@
         </div>
         <span class="metric-value" id="depthVal">50%</span>
       </div>
+    </div>
+
+    <div class="trust-extra">
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">why this score?</span>
+        </div>
+        <ul class="panel-list" id="scoreReasonsList">
+          <li>No signals yet</li>
+        </ul>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">verification actions</span>
+          <span class="panel-count" id="verificationCount">0</span>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">trust timeline</span>
+        </div>
+        <div class="timeline-chart" id="trustTimeline">
+          <span>No trend yet</span>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">intervention history</span>
+        </div>
+        <ul class="panel-list" id="interventionHistoryList">
+          <li>No nudges yet</li>
+        </ul>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">intervention types</span>
+        </div>
+        <div class="nudge-types" id="interventionTypesList">
+          <span>No categories yet</span>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">user correction</span>
+        </div>
+        <div class="correction-actions">
+          <button class="small-panel-btn" id="verifiedElsewhereBtn">I verified elsewhere</button>
+          <button class="small-panel-btn" id="scoreWrongBtn">This score is wrong</button>
+        </div>
+      </div>
+
+      <div class="panel-block session-reflection" id="sessionReflection" style="display:none;">
+        <div class="panel-block-head">
+          <span class="panel-block-title">session reflection</span>
+        </div>
+        <div class="reflection-question">
+          <span>Did you verify anything?</span>
+          <div class="choice-row" data-question="verified">
+            <button class="choice-btn" data-value="yes">yes</button>
+            <button class="choice-btn" data-value="no">no</button>
+          </div>
+        </div>
+        <div class="reflection-question">
+          <span>Did GUARD interrupt too much?</span>
+          <div class="choice-row" data-question="intrusive">
+            <button class="choice-btn" data-value="yes">yes</button>
+            <button class="choice-btn" data-value="no">no</button>
+          </div>
+        </div>
+        <div class="reflection-question">
+          <span>Did this help you think critically?</span>
+          <div class="choice-row" data-question="helpful">
+            <button class="choice-btn" data-value="yes">yes</button>
+            <button class="choice-btn" data-value="no">no</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-head">
+          <span class="panel-block-title">score legend</span>
+        </div>
+        <div class="legend-list">
+          <span><strong>70-100</strong> healthy engagement</span>
+          <span><strong>40-69</strong> moderate caution</span>
+          <span><strong>10-39</strong> overreliance risk</span>
+        </div>
+      </div>
+
+      <button class="export-btn" id="exportSessionBtn">Export PDF report</button>
     </div>
 
     <!-- Intervention zone -->
@@ -162,7 +258,7 @@
     <div style="font-family:var(--font-mono); font-size:18px; color:var(--ink); background:var(--bg2); padding:12px; border-radius:var(--radius);">
       Unlocking in <span id="lockTimer" style="color:var(--accent); font-weight:bold;">10</span>s
     </div>
-    <p style="font-size:11px; color:var(--ink3); margin-top:16px;">(Clicking a source link unlocks immediately)</p>
+    <p style="font-size:11px; color:var(--ink3); margin-top:16px;">The pause gives you time to verify before continuing.</p>
   </div>
 </div>
 
