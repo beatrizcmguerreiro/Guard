@@ -51,7 +51,7 @@ async function triggerUserAction(actionName) {
     });
     const data = await res.json();
     if (!data.error) {
-      chat.trust = data.trust;
+      chat.trust = { ...chat.trust, ...data.trust };
       chat.trust_data = data.trust_data;
       saveState();
       updateTrustPanel(chat.trust);

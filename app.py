@@ -112,9 +112,9 @@ def generate_dynamic_sources(ai_response, client):
             temperature=0,
         )
         content = completion.choices[0].message.content.strip()
-        if content.startswith("```"):
-            content = re.sub(r"^```(?:json)?\s*", "", content)
-            content = re.sub(r"\s*```$", "", content)
+        match = re.search(r'\[.*\]', content, re.DOTALL)
+        if match:
+            content = match.group(0)
         queries = json.loads(content)
         sources = []
         for q in queries[:2]:
@@ -156,6 +156,21 @@ def classify_user_intent(user_message, client):
     except:
         return "STATEMENT"
 
+def classify_topic(user_message, client):
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "Categorize the user's message into EXACTLY ONE of the following topics based on risk:\n1. HIGH_RISK: Medical advice, legal documents, financial decisions, safety.\n2. LOW_RISK: Brainstorming, creative writing, casual chat, fiction.\n3. MODERATE_RISK: Everything else (programming, general knowledge, etc).\n\nReply ONLY with the exact category name."},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=10,
+            temperature=0,
+        )
+        return completion.choices[0].message.content.strip().upper()
+    except:
+        return "MODERATE_RISK"
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -190,6 +205,16 @@ def chat():
     td["total_messages"] += 1
 
     delta_r = 0
+    if td.get("pending_red_team_check"):
+        msg_lower = user_message.lower()
+        if any(w in msg_lower for w in ["yes", "looks good", "proceed", "ok", "sure", "right", "correct", "yep", "yeah", "sounds right", "makes sense"]):
+            delta_r -= 30
+            remember_score_reason(td, "Failed self-correction test (Blind trust)")
+        else:
+            delta_r += 15
+            remember_score_reason(td, "Passed self-correction test")
+        td["pending_red_team_check"] = False
+
     if td["last_message_time"]:
         time_taken = now - td["last_message_time"]
         
@@ -259,7 +284,13 @@ def chat():
         td["current_depth_score"] = int(td.get("current_depth_score", 50) * 0.7 + target_depth * 0.3)
 
 # call api definida em cima
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if td["total_messages"] > 0 and td["total_messages"] % 10 == 0:
+        td["pending_red_team_check"] = True
+        sys_prompt = SYSTEM_PROMPT + "\n\nDELIBERATE TEST: Inject a highly visible caveat or a harmless logical flaw into your main answer. You MUST end the conversational part of your message (BEFORE the Confidence Score) EXACTLY with: 'Wait, does that sound right to you?'"
+    else:
+        sys_prompt = SYSTEM_PROMPT
+
+    messages = [{"role": "system", "content": sys_prompt}]
     for msg in chat_history[-10:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": user_message})
@@ -291,6 +322,12 @@ def chat():
         ai_sources_text = None
 
     settings = data.get("settings", {"strictness": 50})
+    topic_risk = classify_topic(user_message, client)
+    if "HIGH_RISK" in topic_risk:
+        settings["strictness"] = 90
+    elif "LOW_RISK" in topic_risk:
+        settings["strictness"] = 20
+
     td["last_message_time"] = time.time()
     research_score, depth_score = calculate_trust_score(td)
     intervene = should_intervene(td, settings)
