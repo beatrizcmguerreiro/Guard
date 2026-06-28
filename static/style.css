@@ -681,7 +681,6 @@ body {
   font-weight: 500;
   letter-spacing: 0;
   color: var(--ink3);
-  text-transform: lowercase;
 }
 
 .panel-count {
