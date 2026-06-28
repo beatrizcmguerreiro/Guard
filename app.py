@@ -98,6 +98,32 @@ def get_intervention_message(td, settings):
         return "Try asking a more specific or detailed question to get a deeper and better answer."
     return "Remember: AI can be wrong. Consider double-checking key facts before acting on them."
 
+def generate_dynamic_sources(ai_response, client):
+    import json
+    import urllib.parse
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "You are a fact-checking assistant. Extract the 2 most falsifiable or factual claims from the text provided. Generate a specific Google Search query for each claim to help the user verify it. Output ONLY a JSON array of strings, where each string is a search query. Example: [\"2024 WHO guidelines on X\", \"History of Y treaty\"]"},
+                {"role": "user", "content": ai_response}
+            ],
+            max_tokens=150,
+            temperature=0,
+        )
+        content = completion.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = re.sub(r"^```(?:json)?\s*", "", content)
+            content = re.sub(r"\s*```$", "", content)
+        queries = json.loads(content)
+        sources = []
+        for q in queries[:2]:
+            url = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}"
+            sources.append(f"<a href='{url}' target='_blank' onclick='trackLinkClick()'>Search: {q}</a>")
+        return sources
+    except Exception as e:
+        return []
+
 def get_sources_suggestion(user_message):
     msg = user_message.lower()
     if any(w in msg for w in ["health", "medical", "symptom", "disease", "drug"]):
@@ -269,7 +295,13 @@ def chat():
     research_score, depth_score = calculate_trust_score(td)
     intervene = should_intervene(td, settings)
     intervention_msg = get_intervention_message(td, settings) if intervene else None
-    sources = get_sources_suggestion(user_message) if intervene or research_score < 50 else []
+    
+    sources = []
+    if intervene or research_score < 50:
+        sources = generate_dynamic_sources(ai_response, client)
+        if not sources:
+            sources = get_sources_suggestion(user_message)
+            
     if intervene:
         if intervention_msg and "specific" in intervention_msg:
             remember_intervention(td, "Suggested a deeper prompt", "reflection nudge")
@@ -368,6 +400,11 @@ def user_action():
     elif action == "session_reflection":
         td["current_research_score"] = min(100, td.get("current_research_score", 50) + 5)
         remember_score_reason(td, "Completed session reflection")
+    elif action == "copy_paste_detected":
+        td["current_research_score"] = max(10, td.get("current_research_score", 50) - 15)
+        td["current_depth_score"] = max(10, td.get("current_depth_score", 50) - 5)
+        remember_score_reason(td, "Copied large chunk of text from AI response")
+        
         
     settings = data.get("settings", {"strictness": 50})
     research_score, depth_score = calculate_trust_score(td)

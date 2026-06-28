@@ -123,6 +123,15 @@ const interventionTypesList = document.getElementById('interventionTypesList');
 const verifiedElsewhereBtn = document.getElementById('verifiedElsewhereBtn');
 const sessionReflection = document.getElementById('sessionReflection');
 
+if (chatArea) {
+  chatArea.addEventListener('copy', () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 50) {
+      triggerUserAction('copy_paste_detected');
+    }
+  });
+}
+
 function loadPanelWidth() {
   const savedWidth = parseInt(localStorage.getItem('guard_trust_panel_width') || '', 10);
   if (!Number.isNaN(savedWidth)) {
