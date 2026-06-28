@@ -1,5 +1,6 @@
 import os
 import time
+import re
 from flask import Flask, render_template, request, jsonify, session
 from groq import Groq
 
@@ -110,6 +111,25 @@ def get_sources_suggestion(user_message):
     else:
         return ["<a href='https://en.wikipedia.org' target='_blank' onclick='trackLinkClick()'>Wikipedia</a>", "<a href='https://scholar.google.com' target='_blank' onclick='trackLinkClick()'>Google Scholar</a>"]
 
+def classify_user_intent(user_message, client):
+    try:
+        completion = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "You are an intent classifier. Categorize the user's message into EXACTLY ONE of the following categories:\n1. BLIND_COMMAND: The user is asking for an answer or action without wanting explanations (e.g. 'just do it', 'only the code', 'no explanation').\n2. VERIFICATION_REQUEST: The user is asking for sources, reading material, articles, papers, proof, references, or fact-checking the AI.\n3. FOLLOW_UP_QUESTION: The user is asking a genuine question to learn more (e.g. 'how does that work?', 'why?', 'can you explain?').\n4. STATEMENT: The user is just making a statement, providing context, or issuing a normal instruction that doesn't fit the above.\n\nReply ONLY with the exact category name."},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=10,
+            temperature=0,
+        )
+        intent = completion.choices[0].message.content.strip().upper()
+        for valid in ["BLIND_COMMAND", "VERIFICATION_REQUEST", "FOLLOW_UP_QUESTION", "STATEMENT"]:
+            if valid in intent:
+                return valid
+        return "STATEMENT"
+    except:
+        return "STATEMENT"
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -163,18 +183,34 @@ def chat():
                 delta_r += 5
                 remember_score_reason(td, "User spent time reviewing the previous answer")
 
-    blind_phrases = ["just do it", "do this", "no explanation", "without explanation", "only the answer", "don't explain"]
-    if any(p in user_message.lower() for p in blind_phrases):
+    # Use LLM to classify intent instead of rigid keywords
+    intent = classify_user_intent(user_message, client)
+    
+    # Fallback to prevent LLM misclassifications on obvious questions
+    if intent == "STATEMENT":
+        msg_lower = user_message.lower()
+        question_words = ["what", "why", "how", "when", "who", "where", "?", "can you", "could you", "is it", "are there"]
+        verification_words = ["source", "reference", "link", "prove", "where did you get", "fact check", "verify", "article", "paper", "read"]
+        if any(w in msg_lower for w in verification_words):
+            intent = "VERIFICATION_REQUEST"
+        elif any(w in msg_lower for w in question_words):
+            intent = "FOLLOW_UP_QUESTION"
+            
+    if intent == "BLIND_COMMAND":
         delta_r -= 20
         td["blind_commands"] = td.get("blind_commands", 0) + 1
-        remember_score_reason(td, "Blind-compliance phrase detected")
-
-    question_words = ["what", "why", "how", "when", "who", "where", "?", "can you", "could you", "is it", "are there"]
-    if any(w in user_message.lower() for w in question_words):
+        td["no_followup_streak"] += 1
+        remember_score_reason(td, "Blind-compliance behavior detected")
+    elif intent == "VERIFICATION_REQUEST":
+        td["no_followup_streak"] = 0
+        delta_r += 10
+        remember_score_reason(td, "User requested verification sources")
+    elif intent == "FOLLOW_UP_QUESTION":
         td["no_followup_streak"] = 0
         delta_r += 5
         remember_score_reason(td, "Follow-up question detected")
     else:
+        # STATEMENT
         td["no_followup_streak"] += 1
         delta_r -= 5
         remember_score_reason(td, "No follow-up question detected")
@@ -207,11 +243,26 @@ def chat():
             model=MODEL,
             messages=messages,
             max_tokens=1024,
-            temperature=0.7, # podemos ajustar a temperatura o 0.7 e o default que o chatgpt usa por exemplo, podemos ter + halicinacoes e inventar com temp mais baixa e vice versa, so ns se compensa aumentar mais
+            temperature=0.7,
         )
         ai_response = completion.choices[0].message.content
+        
+        confidence_value = None
+        conf_match = re.search(r'\*?\*?Confidence Score:\s*(\d+)%?\*?\*?', ai_response, re.IGNORECASE)
+        if conf_match:
+            confidence_value = int(conf_match.group(1))
+            ai_response = re.sub(r'\*?\*?Confidence Score:\s*\d+%?\*?\*?', '', ai_response, flags=re.IGNORECASE).strip()
+            
+        ai_sources_text = None
+        sources_match = re.search(r'\*?\*?Recommended Verification Sources:\*?\*?\s*(.*)', ai_response, re.IGNORECASE | re.DOTALL)
+        if sources_match:
+            ai_sources_text = sources_match.group(1).strip()
+            ai_response = re.sub(r'\*?\*?Recommended Verification Sources:\*?\*?\s*.*', '', ai_response, flags=re.IGNORECASE | re.DOTALL).strip()
+            
     except Exception as e:
         ai_response = f"Sorry, I encountered an error: {str(e)}. Please check your API key."
+        confidence_value = None
+        ai_sources_text = None
 
     settings = data.get("settings", {"strictness": 50})
     td["last_message_time"] = time.time()
@@ -236,6 +287,8 @@ def chat():
 
     return jsonify({
         "response": ai_response,
+        "confidence": confidence_value,
+        "ai_sources": ai_sources_text,
         "trust": {
             "research_score": research_score,
             "depth_score": depth_score,
@@ -291,44 +344,43 @@ def update_trust():
         "trust_data": td
     })
 
-@app.route("/correct_trust", methods=["POST"])
-def correct_trust():
+@app.route("/user_action", methods=["POST"])
+def user_action():
     data = request.json
+    action = data.get("action")
     td = data.get("trust_data")
-    if not td:
-        return jsonify({"error": "No trust data"}), 400
-    ensure_trust_lists(td)
-
-    correction = data.get("correction", "User corrected the score")
+    if not td: return jsonify({"error": "No trust data"}), 400
+    
+    msg_id = td.get("total_messages", 0)
+    if action == "verified_elsewhere":
+        if td.get("last_verified_msg") == msg_id:
+            return jsonify({"error": "Already verified this message"}), 400
+        td["last_verified_msg"] = msg_id
+        td["current_research_score"] = min(100, td.get("current_research_score", 50) + 15)
+        remember_score_reason(td, "User verified elsewhere")
+    elif action == "score_wrong":
+        if td.get("last_correction_msg") == msg_id:
+            return jsonify({"error": "Already corrected this message"}), 400
+        td["last_correction_msg"] = msg_id
+        td["current_research_score"] = min(100, td.get("current_research_score", 50) + 10)
+        td["current_depth_score"] = min(100, td.get("current_depth_score", 50) + 10)
+        remember_score_reason(td, "User manually corrected score")
+    elif action == "session_reflection":
+        td["current_research_score"] = min(100, td.get("current_research_score", 50) + 5)
+        remember_score_reason(td, "Completed session reflection")
+        
     settings = data.get("settings", {"strictness": 50})
-    td["current_research_score"] = max(10, min(100, td.get("current_research_score", 50) + 15))
-    td["current_depth_score"] = max(10, min(100, td.get("current_depth_score", 50) + 5))
-    td["user_corrections"].append({
-        "message": td.get("total_messages", 0),
-        "correction": correction,
-    })
-    td["user_corrections"] = td["user_corrections"][-5:]
-    remember_score_reason(td, correction)
-    remember_intervention(td, "User corrected GUARD's interpretation", "user correction")
-
     research_score, depth_score = calculate_trust_score(td)
     intervene = should_intervene(td, settings)
-    intervention_msg = get_intervention_message(td, settings) if intervene else None
-    is_locked = (research_score + depth_score) / 2 < 20
-    remember_timeline_point(td)
-
+    
     return jsonify({
         "trust": {
             "research_score": research_score,
             "depth_score": depth_score,
             "intervene": intervene,
-            "intervention_message": intervention_msg,
-            "locked": is_locked,
             "score_reasons": td.get("score_reasons", []),
             "intervention_history": td.get("intervention_history", []),
-            "intervention_types": td.get("intervention_types", []),
-            "score_timeline": td.get("score_timeline", []),
-            "verification_actions": td.get("links_clicked", 0),
+            "intervention_types": td.get("intervention_types", [])
         },
         "trust_data": td
     })

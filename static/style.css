@@ -61,14 +61,28 @@ body {
 }
 
 .sidebar.collapsed {
-  width: 52px;
+  width: 64px;
 }
 .sidebar.collapsed .sidebar-label,
 .sidebar.collapsed .chat-list,
 .sidebar.collapsed .new-chat-btn span,
 .sidebar.collapsed .user-name {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
+}
+.sidebar.collapsed .sidebar-top {
+  padding: 0 16px 20px;
+  justify-content: center;
+}
+.sidebar.collapsed .sidebar-actions {
+  padding: 0 16px 14px;
+}
+.sidebar.collapsed .new-chat-btn {
+  padding: 10px;
+  justify-content: center;
+}
+.sidebar.collapsed .sidebar-user {
+  padding: 16px 14px 0;
+  justify-content: center;
 }
 
 .sidebar-top {
@@ -165,7 +179,7 @@ body {
   gap: 10px;
   padding: 16px 20px 0;
   border-top: 1px solid var(--border2);
-  margin-top: 10px;
+  margin-top: auto;
 }
 .user-avatar {
   width: 34px;
@@ -192,6 +206,49 @@ body {
   position: relative;
   z-index: 5;
   min-width: 0;
+}
+
+/* Message contents */
+.confidence-widget {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.confidence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink2);
+}
+.confidence-bar-bg {
+  height: 6px;
+  background: var(--border2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.confidence-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.confidence-bar-fill.high { background: #27ae60; }
+.confidence-bar-fill.med { background: #f39c12; }
+.confidence-bar-fill.low { background: #c0392b; }
+.ai-sources-widget {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink3);
+  font-family: var(--font-mono);
+  background: rgba(0,0,0,0.02);
+  padding: 8px;
+  border-radius: 4px;
 }
 
 /* Welcome screen */
@@ -912,8 +969,12 @@ body {
   .trust-panel { display: none; }
 }
 @media (max-width: 600px) {
-  .sidebar { width: 52px; }
+  .sidebar { width: 64px; }
   .sidebar-label, .chat-list, .new-chat-btn span, .user-name { display: none; }
+  .sidebar .sidebar-top { padding: 0 16px 20px; justify-content: center; }
+  .sidebar .sidebar-actions { padding: 0 16px 14px; }
+  .sidebar .new-chat-btn { padding: 10px; justify-content: center; }
+  .sidebar .sidebar-user { padding: 16px 14px 0; justify-content: center; }
 }
 
 /* Modal */
