@@ -5,9 +5,11 @@ const state = {
   chats: [],
   activeChatId: null,
   isLoading: false,
+  settings: { strictness: 50 }
 };
 
 function saveState() {
+  localStorage.setItem('guard_settings', JSON.stringify(state.settings));
   localStorage.setItem(SAVED_CHATS_KEY, JSON.stringify(state.chats));
   localStorage.setItem(SAVED_ACTIVE_CHAT_KEY, state.activeChatId || '');
 }
@@ -17,6 +19,8 @@ function loadState() {
     const savedChats = localStorage.getItem(SAVED_CHATS_KEY);
     if (savedChats) state.chats = JSON.parse(savedChats);
     state.activeChatId = localStorage.getItem(SAVED_ACTIVE_CHAT_KEY) || null;
+    const savedSettings = localStorage.getItem('guard_settings');
+    if (savedSettings) state.settings = JSON.parse(savedSettings);
   } catch (e) {
     console.error('Error loading state from localStorage:', e);
   }
@@ -26,6 +30,30 @@ loadState();
 
 //coisinhas definidas no html
 const sidebar        = document.getElementById('sidebar');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const strictnessRange = document.getElementById('strictnessRange');
+const strictnessVal = document.getElementById('strictnessVal');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+if (settingsBtn && settingsModal) {
+  settingsBtn.addEventListener('click', () => {
+    strictnessRange.value = state.settings.strictness;
+    strictnessVal.textContent = state.settings.strictness;
+    settingsModal.style.display = 'flex';
+  });
+
+  strictnessRange.addEventListener('input', (e) => {
+    strictnessVal.textContent = e.target.value;
+  });
+
+  closeSettingsBtn.addEventListener('click', () => {
+    state.settings.strictness = parseInt(strictnessRange.value, 10);
+    saveState();
+    settingsModal.style.display = 'none';
+  });
+}
+
 const sidebarToggle  = document.getElementById('sidebarToggle');
 const newChatBtn     = document.getElementById('newChatBtn');
 const chatList       = document.getElementById('chatList');
@@ -59,15 +87,15 @@ setGreeting();
 
 function createChat() {
   const id = Date.now().toString();
-  const chat = { id, title: 'New chat', history: [] };
+  const chat = { id, title: 'New chat', history: [], trust_data: null, trust: null };
   state.chats.unshift(chat);
   state.activeChatId = id;
   saveState();
   renderChatList();
   showWelcome();
+  messages.innerHTML = '';
   messageInput.focus();
   resetTrustPanel();
-  fetch('/reset', { method: 'POST' });
 }
 
 function setActiveChat(id) {
@@ -76,12 +104,21 @@ function setActiveChat(id) {
   renderChatList();
   const chat = state.chats.find(c => c.id === id);
   if (!chat) return;
+  
+  messages.innerHTML = '';
   if (chat.history.length === 0) {
     showWelcome();
   } else {
     showChat();
-    messages.innerHTML = '';
-    chat.history.forEach(m => appendMessage(m.role, m.content));
+    chat.history.forEach(m => appendMessage(m.role, m.content, m.interventionText));
+  }
+
+  if (chat.trust) {
+    updateTrustPanel(chat.trust);
+    applyLockout(chat.trust);
+  } else {
+    resetTrustPanel();
+    applyLockout({ locked: false });
   }
 }
 
@@ -148,13 +185,18 @@ function appendMessage(role, content, interventionText) {
 }
 
 function formatContent(text) {
-  return text
+  let formatted = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
+    
+  // Convert URLs to clickable links and track clicks
+  formatted = formatted.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" onclick="trackLinkClick()">$1</a>');
+  
+  return formatted;
 }
 
 function showTyping() {
@@ -169,6 +211,50 @@ function showTyping() {
 function removeTyping() {
   const el = document.getElementById('typingIndicator');
   if (el) el.remove();
+}
+
+function applyLockout(trust) {
+  const modal = document.getElementById('lockdownModal');
+  const timerEl = document.getElementById('lockTimer');
+  if (!modal || !timerEl) return;
+  
+  if (trust.locked) {
+    if (window.lockInterval) return; // already locked
+    messageInput.disabled = true;
+    sendBtn.disabled = true;
+    modal.style.display = 'flex';
+    let timeLeft = 10;
+    timerEl.textContent = timeLeft;
+    
+    window.lockInterval = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(window.lockInterval);
+        window.lockInterval = null;
+        modal.style.display = 'none';
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+        const chat = state.chats.find(c => c.id === state.activeChatId);
+        if (chat && chat.trust_data) {
+           chat.trust_data.current_research_score = Math.min(100, (chat.trust_data.current_research_score || 50) + 15);
+           chat.trust_data.current_depth_score = Math.min(100, (chat.trust_data.current_depth_score || 50) + 10);
+           saveState();
+        }
+      }
+    }, 1000);
+  } else {
+    // Unlock early if score improved
+    if (window.lockInterval) {
+      clearInterval(window.lockInterval);
+      window.lockInterval = null;
+    }
+    modal.style.display = 'none';
+    if (!state.isLoading) {
+      messageInput.disabled = false;
+      sendBtn.disabled = false;
+    }
+  }
 }
 
 // trust panel
@@ -250,7 +336,9 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: text,
-        history: chat.history.slice(0, -1),  // excluimos o que adicionamos agr(message:text) // dai o -1
+        history: chat.history.slice(0, -1).map(m => ({role: m.role, content: m.content})),
+        trust_data: chat.trust_data || null,
+        settings: state.settings
       }),
     });
 
@@ -260,14 +348,16 @@ async function sendMessage() {
     if (data.error) {
       appendMessage('assistant', 'error' + data.error);
     } else {
-      chat.history.push({ role: 'assistant', content: data.response });
+      const intervention = data.trust?.intervene ? data.trust.intervention_message : null;
+      chat.history.push({ role: 'assistant', content: data.response, interventionText: intervention });
+      chat.trust = data.trust;
+      chat.trust_data = data.trust_data;
       saveState();
-      appendMessage(
-        'assistant',
-        data.response,
-        data.trust?.intervene ? data.trust.intervention_message : null
-      );
-      if (data.trust) updateTrustPanel(data.trust);
+      appendMessage('assistant', data.response, intervention);
+      if (data.trust) {
+        updateTrustPanel(data.trust);
+        applyLockout(data.trust);
+      }
     }
   } catch (err) {
     removeTyping();
@@ -280,6 +370,30 @@ async function sendMessage() {
 }
 
 //dar auto rezise ao input
+window.trackLinkClick = async function() {
+  if (!state.activeChatId) return;
+  const chat = state.chats.find(c => c.id === state.activeChatId);
+  if (!chat || !chat.trust_data) return;
+
+  try {
+    const res = await fetch('/update_trust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trust_data: chat.trust_data, settings: state.settings }),
+    });
+    const data = await res.json();
+    if (!data.error) {
+      chat.trust = { ...chat.trust, ...data.trust };
+      chat.trust_data = data.trust_data;
+      saveState();
+      updateTrustPanel(chat.trust);
+      applyLockout(chat.trust);
+    }
+  } catch (err) {
+    console.error("Failed to update trust score on link click");
+  }
+};
+
 function autoResize() {
   messageInput.style.height = 'auto';
   messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + 'px';
