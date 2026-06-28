@@ -16,12 +16,12 @@
     <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar">
       <span></span><span></span><span></span>
     </button>
-    <span class="sidebar-label">chats</span>
+    <span class="sidebar-label">Chats</span>
   </div>
 
   <div class="sidebar-actions">
     <button class="new-chat-btn" id="newChatBtn">
-      <span>new</span>
+      <span>New</span>
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
@@ -53,10 +53,10 @@
         <svg class="flag-svg" viewBox="0 0 140 80" fill="none" xmlns="http://www.w3.org/2000/svg">
           <line x1="28" y1="8" x2="28" y2="76" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           <polygon points="28,10 118,28 28,46" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <text x="42" y="34" font-family="Instrument Serif" font-size="17" fill="currentColor" font-style="italic">GUARD</text>
+          <text x="36" y="34" font-family="Instrument Serif" font-size="17" fill="currentColor" font-style="italic">GUARD</text>
         </svg>
       </div>
-      <p class="tagline">think for yourself</p>
+      <p class="tagline">Think for yourself</p>
     </div>
     <h1 class="welcome-greeting" id="greeting">Good morning!</h1>
     <p class="welcome-sub">Ask me anything - I'll help you think critically.</p>
@@ -96,12 +96,12 @@
   </button>
 
   <div class="trust-content">
-    <h2 class="trust-title">trust rate</h2>
-    <p class="trust-subtitle">based on your queries</p>
+    <h2 class="trust-title">Trust Rate</h2>
+    <p class="trust-subtitle">Based on your queries</p>
 
     <div class="trust-metrics">
       <div class="metric">
-        <span class="metric-label">your research</span>
+        <span class="metric-label">Your Research</span>
         <div class="metric-bar-track">
           <div class="metric-bar research-bar" id="researchBar" style="width: 50%"></div>
         </div>
@@ -109,7 +109,7 @@
       </div>
 
       <div class="metric">
-        <span class="metric-label">prompt depth</span>
+        <span class="metric-label">Prompt Depth</span>
         <div class="metric-bar-track">
           <div class="metric-bar depth-bar" id="depthBar" style="width: 50%"></div>
         </div>
@@ -120,7 +120,7 @@
     <div class="trust-extra">
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">why this score?</span>
+          <span class="panel-block-title">Why this score?</span>
         </div>
         <ul class="panel-list" id="scoreReasonsList">
           <li>No signals yet</li>
@@ -129,14 +129,14 @@
 
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">verification actions</span>
+          <span class="panel-block-title">Verification Actions</span>
           <span class="panel-count" id="verificationCount">0</span>
         </div>
       </div>
 
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">trust timeline</span>
+          <span class="panel-block-title">Trust Timeline</span>
         </div>
         <div class="timeline-chart" id="trustTimeline">
           <span>No trend yet</span>
@@ -145,7 +145,7 @@
 
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">intervention history</span>
+          <span class="panel-block-title">Intervention History</span>
         </div>
         <ul class="panel-list" id="interventionHistoryList">
           <li>No nudges yet</li>
@@ -154,7 +154,7 @@
 
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">intervention types</span>
+          <span class="panel-block-title">Intervention Types</span>
         </div>
         <div class="nudge-types" id="interventionTypesList">
           <span>No categories yet</span>
@@ -163,7 +163,7 @@
 
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">user correction</span>
+          <span class="panel-block-title">User Correction</span>
         </div>
         <div class="correction-actions">
           <button class="small-panel-btn" id="verifiedElsewhereBtn">I verified elsewhere</button>
@@ -173,39 +173,39 @@
 
       <div class="panel-block session-reflection" id="sessionReflection" style="display:none;">
         <div class="panel-block-head">
-          <span class="panel-block-title">session reflection</span>
+          <span class="panel-block-title">Session Reflection</span>
         </div>
         <div class="reflection-question">
           <span>Did you verify anything?</span>
           <div class="choice-row" data-question="verified">
-            <button class="choice-btn" data-value="yes">yes</button>
-            <button class="choice-btn" data-value="no">no</button>
+            <button class="choice-btn" data-value="yes">Yes</button>
+            <button class="choice-btn" data-value="no">No</button>
           </div>
         </div>
         <div class="reflection-question">
           <span>Did GUARD interrupt too much?</span>
           <div class="choice-row" data-question="intrusive">
-            <button class="choice-btn" data-value="yes">yes</button>
-            <button class="choice-btn" data-value="no">no</button>
+            <button class="choice-btn" data-value="yes">Yes</button>
+            <button class="choice-btn" data-value="no">No</button>
           </div>
         </div>
         <div class="reflection-question">
           <span>Did this help you think critically?</span>
           <div class="choice-row" data-question="helpful">
-            <button class="choice-btn" data-value="yes">yes</button>
-            <button class="choice-btn" data-value="no">no</button>
+            <button class="choice-btn" data-value="yes">Yes</button>
+            <button class="choice-btn" data-value="no">No</button>
           </div>
         </div>
       </div>
 
       <div class="panel-block">
         <div class="panel-block-head">
-          <span class="panel-block-title">score legend</span>
+          <span class="panel-block-title">Score Legend</span>
         </div>
         <div class="legend-list">
-          <span><strong>70-100</strong> healthy engagement</span>
-          <span><strong>40-69</strong> moderate caution</span>
-          <span><strong>10-39</strong> overreliance risk</span>
+          <span><strong>70-100</strong> Healthy engagement</span>
+          <span><strong>40-69</strong> Moderate caution</span>
+          <span><strong>10-39</strong> Overreliance risk</span>
         </div>
       </div>
 

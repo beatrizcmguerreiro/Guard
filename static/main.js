@@ -280,7 +280,7 @@ function appendMessage(role, content, interventionText, showReflection = false) 
 
   const roleEl = document.createElement('span');
   roleEl.className = 'message-role';
-  roleEl.textContent = role === 'user' ? 'you' : 'guard';
+  roleEl.textContent = role === 'user' ? 'You' : 'GUARD';
 
   const timeEl = document.createElement('span');
   timeEl.className = 'message-time';
@@ -363,8 +363,8 @@ function renderTimeline(points) {
       <polyline class="timeline-line timeline-depth" points="${makePolyline('depth')}"></polyline>
     </svg>
     <div class="timeline-key">
-      <span><i class="key-research"></i>research</span>
-      <span><i class="key-depth"></i>depth</span>
+      <span><i class="key-research"></i>Research</span>
+      <span><i class="key-depth"></i>Depth</span>
     </div>
   `;
 }
