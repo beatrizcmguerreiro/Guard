@@ -18,6 +18,10 @@ GUARD acts as an intermediary layer between the user and the language model.
     - **Feedback**: Users are prompted to verify facts, reducing reliance and recalibrating the trust loop.
 
 ## Prototype Features
+- **AI-Powered Intent Classification**: Replaced rigid keyword heuristics with a secondary, lightning-fast LLM call to intelligently categorize user prompts as Verification Requests, Follow-up Questions, Statements, or Blind Commands.
+- **Visual Confidence Meter**: Extracts the AI's internal confidence score and renders it as a highly visible, color-coded gauge to explicitly manifest uncertainty and prevent automation bias.
+- **Suggested Searches Widget**: Extracts and formats the AI's recommended verification sources into a distinct UI block below messages.
+- **Interactive User Feedback**: Fully wired the "I verified elsewhere", "This score is wrong", and "Session Reflection" components to the backend (with server-side anti-spam limits), allowing users to actively correct the algorithm.
 - **Explainable Trust Panel**: Shows short reasons behind score changes, such as very short prompts, missing follow-up questions, or source clicks.
 - **Verification Tracking**: Counts source-click actions as observable verification behavior.
 - **Intervention History**: Keeps a visible record of GUARD's nudges during the session.
@@ -30,6 +34,7 @@ GUARD acts as an intermediary layer between the user and the language model.
 - **PDF Session Report**: Generates a printable report with the chat, trust state, timeline, interventions, corrections, and reflection answers.
 
 ## Interface and Usability Features
+- **Markdown & Syntax Highlighting**: Integrated `marked.js` and `highlight.js` for clean rendering of code and technical AI responses.
 - **Resizable Trust Panel**: Users can drag the left edge of the Trust Panel to make it wider or narrower, and double-click to reset its width.
 - **Collapsible Side Panels**: The chat sidebar and Trust Panel can be collapsed to give the user more room for the conversation.
 - **Automatic Chat Titles**: Chat names summarize the conversation topic instead of copying the first user message. For example, API-related errors become "API setup check" and greeting-only chats become "General chat".

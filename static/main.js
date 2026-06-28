@@ -36,6 +36,46 @@ const strictnessRange = document.getElementById('strictnessRange');
 const strictnessVal = document.getElementById('strictnessVal');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 
+async function triggerUserAction(actionName) {
+  const chat = state.chats.find(c => c.id === state.activeChatId);
+  if (!chat || !chat.trust_data) return;
+  try {
+    const res = await fetch('/user_action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        action: actionName,
+        trust_data: chat.trust_data,
+        settings: state.settings
+      })
+    });
+    const data = await res.json();
+    if (!data.error) {
+      chat.trust = data.trust;
+      chat.trust_data = data.trust_data;
+      saveState();
+      updateTrustPanel(chat.trust);
+      applyLockout(chat.trust);
+    }
+  } catch (err) {
+    console.error('Failed to trigger action:', actionName);
+  }
+}
+
+const verifiedBtn = document.getElementById('verifiedElsewhereBtn');
+if (verifiedBtn) verifiedBtn.addEventListener('click', () => triggerUserAction('verified_elsewhere'));
+
+const scoreWrongBtn = document.getElementById('scoreWrongBtn');
+if (scoreWrongBtn) scoreWrongBtn.addEventListener('click', () => triggerUserAction('score_wrong'));
+
+document.querySelectorAll('.choice-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.target.parentElement.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+    e.target.classList.add('selected');
+    triggerUserAction('session_reflection');
+  });
+});
+
 if (settingsBtn && settingsModal) {
   settingsBtn.addEventListener('click', () => {
     strictnessRange.value = state.settings.strictness;
@@ -81,7 +121,6 @@ const exportSessionBtn = document.getElementById('exportSessionBtn');
 const trustTimeline = document.getElementById('trustTimeline');
 const interventionTypesList = document.getElementById('interventionTypesList');
 const verifiedElsewhereBtn = document.getElementById('verifiedElsewhereBtn');
-const scoreWrongBtn = document.getElementById('scoreWrongBtn');
 const sessionReflection = document.getElementById('sessionReflection');
 
 function loadPanelWidth() {
@@ -168,7 +207,7 @@ function setActiveChat(id) {
     showWelcome();
   } else {
     showChat();
-    chat.history.forEach(m => appendMessage(m.role, m.content, m.interventionText, m.role === 'assistant'));
+    chat.history.forEach(m => appendMessage(m.role, m.content, m.interventionText, m.confidence, m.aiSources));
   }
 
   if (chat.trust) {
@@ -271,7 +310,7 @@ function formatTime(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function appendMessage(role, content, interventionText, showReflection = false) {
+function appendMessage(role, content, interventionText = null, confidence = null, aiSources = null) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${role}`;
 
@@ -290,34 +329,51 @@ function appendMessage(role, content, interventionText, showReflection = false) 
 
   const body = document.createElement('div');
   body.className = 'message-body';
-  // Simple markdown-ish: bold, line breaks
-  body.innerHTML = formatContent(content);
+  
+  if (role === 'user') {
+    body.textContent = content;
+  } else {
+    // format as markdown
+    body.innerHTML = marked.parse(content);
+    // highlight code blocks
+    body.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+    
+    if (confidence !== null && confidence !== undefined) {
+      const confWidget = document.createElement('div');
+      confWidget.className = 'confidence-widget';
+      let level = 'high';
+      if (confidence < 70) level = 'med';
+      if (confidence < 40) level = 'low';
+      
+      confWidget.innerHTML = `
+        <div class="confidence-header">
+          <span>AI Confidence</span>
+          <strong>${confidence}%</strong>
+        </div>
+        <div class="confidence-bar-bg">
+          <div class="confidence-bar-fill ${level}" style="width: ${confidence}%"></div>
+        </div>
+      `;
+      body.appendChild(confWidget);
+    }
+    
+    if (aiSources) {
+      const srcWidget = document.createElement('div');
+      srcWidget.className = 'ai-sources-widget';
+      srcWidget.innerHTML = `<strong>Suggested searches:</strong><br/>${aiSources.replace(/\n/g, '<br/>')}`;
+      body.appendChild(srcWidget);
+    }
+  }
 
   wrapper.append(meta, body);
 
   if (interventionText) {
     const inv = document.createElement('div');
-    inv.className = 'inline-intervention';
+    inv.className = 'msg-intervention';
     inv.textContent = interventionText;
     wrapper.appendChild(inv);
-  }
-
-  if (showReflection && role === 'assistant') {
-    const actions = document.createElement('div');
-    actions.className = 'reflection-actions';
-    [
-      ['What could be wrong?', 'What could be wrong or uncertain in your previous answer?'],
-      ['Show alternative view', 'Show me an alternative perspective on your previous answer.'],
-      ['Give me sources', 'Give me reliable sources or search queries to verify your previous answer.'],
-    ].forEach(([label, prompt]) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'reflection-btn';
-      button.textContent = label;
-      button.addEventListener('click', () => sendReflectionPrompt(prompt));
-      actions.appendChild(button);
-    });
-    wrapper.appendChild(actions);
   }
 
   messages.appendChild(wrapper);
@@ -387,21 +443,6 @@ function renderNudgeTypes(types) {
 
 function getActiveChat() {
   return state.chats.find(c => c.id === state.activeChatId);
-}
-
-function formatContent(text) {
-  let formatted = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>');
-    
-  // Convert URLs to clickable links and track clicks
-  formatted = formatted.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" onclick="trackLinkClick()">$1</a>');
-  
-  return formatted;
 }
 
 function showTyping() {
@@ -541,7 +582,7 @@ async function sendMessage() {
   saveState();
   appendMessage('user', text);
   messageInput.value = '';
-  autoResize();
+  // autoResize();
 
 
   state.isLoading = true;
@@ -567,12 +608,12 @@ async function sendMessage() {
       appendMessage('assistant', 'error' + data.error);
     } else {
       const intervention = data.trust?.intervene ? data.trust.intervention_message : null;
-      chat.history.push({ role: 'assistant', content: data.response, interventionText: intervention });
+      chat.history.push({ role: 'assistant', content: data.response, interventionText: intervention, confidence: data.confidence, aiSources: data.ai_sources });
       chat.trust = data.trust;
       chat.trust_data = data.trust_data;
       refreshChatTitle(chat);
       saveState();
-      appendMessage('assistant', data.response, intervention, true);
+      appendMessage('assistant', data.response, intervention, data.confidence, data.ai_sources);
       if (data.trust) {
         updateTrustPanel(data.trust);
         applyLockout(data.trust);
@@ -621,33 +662,6 @@ window.trackLinkClick = async function() {
     console.error("Failed to update trust score on link click");
   }
 };
-
-async function correctTrustScore(correction) {
-  const chat = getActiveChat();
-  if (!chat || !chat.trust_data) return;
-
-  try {
-    const res = await fetch('/correct_trust', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        trust_data: chat.trust_data,
-        settings: state.settings,
-        correction,
-      }),
-    });
-    const data = await res.json();
-    if (!data.error) {
-      chat.trust = { ...chat.trust, ...data.trust };
-      chat.trust_data = data.trust_data;
-      saveState();
-      updateTrustPanel(chat.trust);
-      applyLockout(chat.trust);
-    }
-  } catch (err) {
-    console.error('Failed to correct trust score');
-  }
-}
 
 function updateSessionReflection() {
   if (!sessionReflection) return;
@@ -901,10 +915,7 @@ if (exportSessionBtn) {
   exportSessionBtn.addEventListener('click', exportSession);
 }
 if (verifiedElsewhereBtn) {
-  verifiedElsewhereBtn.addEventListener('click', () => correctTrustScore('User reported verifying elsewhere'));
-}
-if (scoreWrongBtn) {
-  scoreWrongBtn.addEventListener('click', () => correctTrustScore('User reported the score was wrong'));
+  // handled by triggerUserAction at top of file
 }
 if (sessionReflection) {
   sessionReflection.addEventListener('click', (event) => {
