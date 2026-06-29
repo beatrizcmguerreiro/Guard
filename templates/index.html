@@ -74,6 +74,11 @@
 
   <!-- Input bar -->
   <div class="input-bar">
+    <div class="reflection-prompts" id="reflectionPrompts">
+      <button class="reflection-prompt-btn" onclick="sendReflectionPrompt('What could be wrong?')">What could be wrong?</button>
+      <button class="reflection-prompt-btn" onclick="sendReflectionPrompt('Show alternative view')">Show alternative view</button>
+      <button class="reflection-prompt-btn" onclick="sendReflectionPrompt('Give me sources')">Give me sources</button>
+    </div>
     <div class="input-wrapper">
       <textarea
         id="messageInput"

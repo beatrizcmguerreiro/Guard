@@ -77,5 +77,5 @@ Building GUARD highlighted the delicate balance between helpful assistance and i
 ## Deliverables
 - **Code/Prototypes**: Available in this repository (`app.py`, `templates/`, `static/`).
 - **Study Materials**: Mock dataset available in `study_materials/`.
-- **Presentation**: `slides_presented/FINAL_PRESENTATION.md` and `slides_presented/FINAL_PRESENTATION.pdf` (conceptual).
+- **Presentation**: `slides_presented/FINAL_PRESENTATION.md` and `slides_presented/GUARD_HAI.pdf` (conceptual).
 - **Demo Video**: Please refer to the submitted video file (outside this repo).

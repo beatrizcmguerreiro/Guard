@@ -18,7 +18,7 @@ and healthy skepticism. When answering:
 2. When appropriate, suggest that the user verify important information.
 3. Mention if information might be outdated or if sources would be helpful.
 4. Encourage the user to think critically rather than blindly accepting your answer.
-5. At the end of your response, ALWAYS include a "**Confidence Score: X%**" stating how confident you are in your answer, and a "**Recommended Verification Sources:**" section with 2-3 specific queries or links they can use to fact-check you.
+5. At the end of your response, ALWAYS include a "**Confidence Score: X%**" stating how confident you are in your answer, and a "**Recommended Verification Sources:**" section with 2-3 specific clickable search links they can use to fact-check you. Format them as HTML links (e.g., <a href="https://www.google.com/search?q=your+query" target="_blank">Search for: your query</a>).
 Keep responses concise and conversational.""" # deviamos acrescentar que queremos algo em que o user use ai para ajudar e nao para fazer e tudo o que for parecido a fazer apenas deves er negado
 
 
@@ -80,7 +80,7 @@ def should_intervene(td, settings):
     interval = max(3, 12 - int(strictness / 10)) # if 50 -> 7, 90 -> 3, 20 -> 10
 
     r, d = calculate_trust_score(td)
-    if r < threshold_r or d < threshold_d:
+    if r < threshold_r:
         return True
     if td["total_messages"] > 0 and td["total_messages"] % interval == 0:
         return True
@@ -94,8 +94,6 @@ def get_intervention_message(td, settings):
     r, d = calculate_trust_score(td)
     if r < threshold_r:
         return "You haven't asked follow-up questions recently so consider verifying this with another source."
-    if d < threshold_d:
-        return "Try asking a more specific or detailed question to get a deeper and better answer."
     return "Remember: AI can be wrong. Consider double-checking key facts before acting on them."
 
 def generate_dynamic_sources(ai_response, client):
@@ -311,10 +309,12 @@ def chat():
             ai_response = re.sub(r'\*?\*?Confidence Score:\s*\d+%?\*?\*?', '', ai_response, flags=re.IGNORECASE).strip()
             
         ai_sources_text = None
-        sources_match = re.search(r'\*?\*?Recommended Verification Sources:\*?\*?\s*(.*)', ai_response, re.IGNORECASE | re.DOTALL)
+        # Use a more robust regex to catch variations like "Suggested searches:", "Recommended Sources:", etc.
+        sources_regex = r'\*?\*?(?:Recommended Verification Sources|Suggested searches|Recommended Sources|Verification Sources|Suggested Verification):\*?\*?\s*(.*)'
+        sources_match = re.search(sources_regex, ai_response, re.IGNORECASE | re.DOTALL)
         if sources_match:
             ai_sources_text = sources_match.group(1).strip()
-            ai_response = re.sub(r'\*?\*?Recommended Verification Sources:\*?\*?\s*.*', '', ai_response, flags=re.IGNORECASE | re.DOTALL).strip()
+            ai_response = re.sub(sources_regex, '', ai_response, flags=re.IGNORECASE | re.DOTALL).strip()
             
     except Exception as e:
         ai_response = f"Sorry, I encountered an error: {str(e)}. Please check your API key."
