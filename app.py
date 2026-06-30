@@ -350,7 +350,7 @@ def chat():
         remember_intervention(td, "Recommended sources", "source nudge")
 
     is_locked = False
-    if (research_score + depth_score) / 2 < 20:
+    if (research_score + depth_score) / 2 < 30:
         is_locked = True
     remember_timeline_point(td)
 
@@ -393,7 +393,7 @@ def update_trust():
     intervention_msg = get_intervention_message(td, settings) if intervene else None
     
     is_locked = False
-    if (research_score + depth_score) / 2 < 20:
+    if (research_score + depth_score) / 2 < 30:
         is_locked = True
     remember_timeline_point(td)
         
@@ -447,11 +447,16 @@ def user_action():
     research_score, depth_score = calculate_trust_score(td)
     intervene = should_intervene(td, settings)
     
+    is_locked = False
+    if (research_score + depth_score) / 2 < 30:
+        is_locked = True
+    
     return jsonify({
         "trust": {
             "research_score": research_score,
             "depth_score": depth_score,
             "intervene": intervene,
+            "locked": is_locked,
             "score_reasons": td.get("score_reasons", []),
             "intervention_history": td.get("intervention_history", []),
             "intervention_types": td.get("intervention_types", [])
